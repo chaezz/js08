@@ -45,14 +45,26 @@ class LSTM_model():
         self.prev_mean = 12.9587
         self.prev_std = 7.6698
         
-        self.mean_se = {'prev' : self.prev_mean, 'Day sin' : self.day_sin_mean , 'Day cos' : self.day_cos_mean}
-        self.std_se = {'prev' : self.prev_std, 'Day sin' : self.day_sin_std , 'Day cos' : self.day_cos_std}
+        
+        self.sun_alt_mean = 12.472478
+        self.sun_alt_std = 35.432907
+        
+        self.sun_azm_mean = 181.121984
+        self.sun_azm_std = 110.512035
+        
+        self.sun_yn_mean = 0.578326
+        self.sun_yn_std = 0.493841
+        
+        self.mean_se = {'prev' : self.prev_mean, 'Day sin' : self.day_sin_mean , 'Day cos' : self.day_cos_mean, 
+                        'sun_altitude' : self.sun_alt_mean, 'sun_azimuth' : self.sun_azm_mean, 'sun_yes_no' : self.sun_yn_mean}
+        self.std_se = {'prev' : self.prev_std, 'Day sin' : self.day_sin_std , 'Day cos' : self.day_cos_std,
+                       'sun_altitude' : self.sun_alt_std, 'sun_azimuth' : self.sun_azm_std, 'sun_yes_no' : self.sun_yn_std}
     
     def load_model(self):
         """" 모델을 불러오는 함수 """
         # 저장된 모델 경로 입력
         # model_path = "model_1654675043"
-        model_path = "./saved_model_20230616153746_multi_feedback/my_model"
+        model_path = "./saved_model_20230817150727_multi/my_model"
         # model_path = "./saved_model/my_model"
         # 모델 불러오기
         new_model = tf.keras.models.load_model(model_path, compile=False)

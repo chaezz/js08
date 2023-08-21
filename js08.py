@@ -10,6 +10,8 @@ import os
 import sys
 import vlc
 import time
+import ephem
+import math
 
 from datetime import timedelta, datetime
 import numpy as np
@@ -164,7 +166,7 @@ class JS08MainWindow(QMainWindow, Ui_MainWindow):
         JS08Settings.restore_value('maxfev_count')
         # seongmin
         self.lstm_model = LSTM_model()
-        self.coulmns = ["prev", "Day sin", "Day cos"]
+        self.coulmns = ["prev", "Day sin", "Day cos", "sun_altitude", "sun_azimuth", "sun_yes_no"]
         self.lstm_df = pd.DataFrame(columns = self.coulmns)
 
         self.show()
@@ -515,15 +517,18 @@ class JS08MainWindow(QMainWindow, Ui_MainWindow):
                 for i in range(18, 0, -1):
                     before_time = now - timedelta(minutes=10 * i)
                     # print("now : ", before_time)
-                    new_serires = {'prev':  pv, "Day sin" : np.sin(before_time.timestamp() * (2 * np.pi / day)), "Day cos" : np.cos(before_time.timestamp() * (2 * np.pi / day))}
-                    self.lstm_df = self.lstm_df.append(new_serires, ignore_index = True)                
+                    sun_alt, sun_azm, sun_yn = self.calculate_sun_altitude(before_time)
+                    new_serires = {'prev':  pv, "Day sin" : np.sin(before_time.timestamp() * (2 * np.pi / day)), "Day cos" : np.cos(before_time.timestamp() * (2 * np.pi / day)),
+                                   "sun_altitude" : sun_alt,"sun_azimuth" : sun_azm,"sun_yes_no" : sun_yn}
+                    self.lstm_df = self.lstm_df.append(new_serires, ignore_index = True)
                 
             # if self.lstm_df.shape[0] == 0:
             #     before_time = now - timedelta(minutes=15)
             #     new_serires = {'prev':  pv, "Day sin" : np.sin(before_time.timestamp() * (2 * np.pi / day)), "Day cos" : np.cos(before_time.timestamp() * (2 * np.pi / day))}
             #     self.lstm_df = self.lstm_df.append(new_serires, ignore_index = True)
 
-            new_serires = {'prev':  pv, "Day sin" : np.sin(current_time * (2 * np.pi / day)), "Day cos" : np.cos(current_time * (2 * np.pi / day))}
+            new_serires = {'prev':  pv, "Day sin" : np.sin(current_time * (2 * np.pi / day)), "Day cos" : np.cos(current_time * (2 * np.pi / day)),
+                           "sun_altitude" : sun_alt,"sun_azimuth" : sun_azm,"sun_yes_no" : sun_yn}
             self.lstm_df = self.lstm_df.append(new_serires, ignore_index = True)
 
             print("self.lstm_df", self.lstm_df.shape)
@@ -565,9 +570,11 @@ class JS08MainWindow(QMainWindow, Ui_MainWindow):
             print("create predict file")
              
         elif now.minute % 10 == 0:
-            
+            print(self.lstm_df.head())
             self.lstm_df.drop([0], axis=0, inplace=True)
-            new_serires = {'prev':  pv, "Day sin" : np.sin(current_time * (2 * np.pi / day)), "Day cos" : np.cos(current_time * (2 * np.pi / day))}
+            sun_alt, sun_azm, sun_yn = self.calculate_sun_altitude(now)
+            new_serires = {'prev':  pv, "Day sin" : np.sin(current_time * (2 * np.pi / day)), "Day cos" : np.cos(current_time * (2 * np.pi / day)),
+                           "sun_altitude" : sun_alt,"sun_azimuth" : sun_azm,"sun_yes_no" : sun_yn}
             self.lstm_df = self.lstm_df.append(new_serires, ignore_index = True)
             # data_df = (self.lstm_df - df_mean) / df_std
             self.lstm_df = self.lstm_df.reset_index(drop=True)
@@ -583,7 +590,7 @@ class JS08MainWindow(QMainWindow, Ui_MainWindow):
             self._predic_plot.appendData(pv, prediction_cvt)
             
             # 10분 뒤 예측값
-            predict_vis_10m = prediction_cvt[0][1][0]
+            predict_vis_10m = prediction_cvt[0][0][0]
             predict_vis_10m = self.lstm_model.find_closest_value(predict_vis_10m, distance_list)
             
             self.predict_vis_meter_10m = predict_vis_10m * 1000
@@ -619,7 +626,23 @@ class JS08MainWindow(QMainWindow, Ui_MainWindow):
             df_predict.to_csv(predict_file_path, mode='w', index=False)
             print("create predict file")
 
+    # 태양과 지평선 사이의 고도각, 방위각, 태양 유무 추가
+    def calculate_sun_altitude(self, dt_value):
+        observer = ephem.Observer()
+        observer.lat = '37.564214'  # 위도 (서울의 위도)
+        observer.lon = '127.001699'  # 경도 (서울의 경도)
+        observer.date = dt_value - timedelta(hours=9)
 
+        sun = ephem.Sun(observer)    
+        altitude = sun.alt  # 태양의 고도각
+        azimuth = sun.az  # 태양의 방위각
+        
+        if math.degrees(altitude) > 0:
+            sun_yn = 1
+        else:
+            sun_yn = 0
+            
+        return math.degrees(altitude), math.degrees(azimuth), sun_yn
 
 
     def thumbnail_refresh(self):
